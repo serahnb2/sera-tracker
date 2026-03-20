@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SERA H&B — Project Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@300;400;500&family=Noto+Sans+KR:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0b0c0e;
+    --surface: #111316;
+    --surface2: #181a1f;
+    --border: #23262d;
+    --border2: #2e3138;
+    --text: #e8eaf0;
+    --text2: #8a8fa3;
+    --text3: #555a6b;
+    --accent-us: #c8a96e;
+    --accent-mx: #6eb8a9;
+    --accent-kr: #a07cd4;
+    --done: #4caf6e;
+    --progress: #e8a83c;
+    --pending: #555a6b;
+    --todo: #3a6cc8;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans KR', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  header {
+    padding: 28px 40px 22px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+  }
+  header::before {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, var(--accent-us), var(--accent-mx), var(--accent-kr));
+    opacity: 0.5;
+  }
+  .logo {
+    font-family: 'DM Serif Display', serif;
+    font-size: 22px;
+    letter-spacing: 0.04em;
+    color: var(--text);
+  }
+  .logo span { color: var(--accent-us); font-style: italic; }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .header-date {
+    font-family: 'DM Mono', monospace;
+    font-size: 9px;
+    color: var(--text3);
+    letter-spacing: 0.08em;
+    text-align: right;
+    white-space: nowrap;
+  }
+  #current-date { color: var(--text2); }
+
+  /* Sync indicator */
+  .sync-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--text3);
+    transition: background 0.3s;
+    flex-shrink: 0;
+    title: '동기화 상태';
+  }
+  .sync-dot.ok { background: var(--done); box-shadow: 0 0 5px var(--done); }
+  .sync-dot.syncing { background: var(--progress); animation: pulse 1s infinite; }
+  .sync-dot.err { background: #e85c3c; }
+
+  main {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0;
+    min-height: calc(100vh - 200px);
+  }
+
+  .project-col {
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    animation: fadeUp 0.6s ease both;
+  }
+  .project-col:last-child { border-right: none; }
+  .project-col:nth-child(1) { animation-delay: 0.05s; }
+  .project-col:nth-child(2) { animation-delay: 0.12s; }
+  .project-col:nth-child(3) { animation-delay: 0.19s; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .col-header {
+    padding: 24px 26px 18px;
+    border-bottom: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+  }
+  .col-header::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0;
+    height: 2px; width: 100%;
+    opacity: 0.7;
+  }
+  .col-us .col-header::after { background: var(--accent-us); }
+  .col-mx .col-header::after { background: var(--accent-mx); }
+  .col-kr .col-header::after { background: var(--accent-kr); }
+
+  .col-flag-country {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+  }
+  .col-flag { font-size: 20px; line-height: 1; }
+  .col-country {
+    font-family: 'DM Serif Display', serif;
+    font-size: 14px; letter-spacing: 0.01em; font-style: italic;
+  }
+  .col-us .col-country { color: var(--accent-us); }
+  .col-mx .col-country { color: var(--accent-mx); }
+  .col-kr .col-country { color: var(--accent-kr); }
+
+  .col-brand {
+    font-family: 'DM Serif Display', serif;
+    font-size: 24px; color: var(--text);
+    letter-spacing: 0.02em; margin-bottom: 8px; line-height: 1;
+  }
+  .col-type {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: 'Noto Sans KR', sans-serif;
+    font-weight: 700; font-size: 12px; letter-spacing: 0.05em;
+    padding: 4px 11px 4px 9px; border-radius: 6px;
+  }
+  .col-type-icon { font-size: 13px; }
+  .col-us .col-type { color: var(--accent-us); background: rgba(200,169,110,0.13); border: 1px solid rgba(200,169,110,0.35); }
+  .col-mx .col-type { color: var(--accent-mx); background: rgba(110,184,169,0.13); border: 1px solid rgba(110,184,169,0.35); }
+  .col-kr .col-type { color: var(--accent-kr); background: rgba(160,124,212,0.13); border: 1px solid rgba(160,124,212,0.35); }
+
+  .progress-bar-wrap {
+    margin-top: 14px; background: var(--border);
+    height: 3px; border-radius: 2px; overflow: hidden;
+  }
+  .progress-bar {
+    height: 100%; border-radius: 2px;
+    transition: width 1.2s cubic-bezier(.4,0,.2,1);
+  }
+  .col-us .progress-bar { background: var(--accent-us); }
+  .col-mx .progress-bar { background: var(--accent-mx); }
+  .col-kr .progress-bar { background: var(--accent-kr); }
+  .progress-label {
+    font-family: 'DM Mono', monospace; font-size: 10px;
+    color: var(--text3); margin-top: 5px;
+    display: flex; justify-content: space-between;
+  }
+  .col-us .progress-pct { color: var(--accent-us); }
+  .col-mx .progress-pct { color: var(--accent-mx); }
+  .col-kr .progress-pct { color: var(--accent-kr); }
+
+  .stages { flex: 1; padding: 12px 0; overflow-y: auto; }
+
+  .stage-item {
+    padding: 12px 26px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer; transition: background 0.18s;
+  }
+  .stage-item:last-child { border-bottom: none; }
+  .stage-item:hover { background: var(--surface2); }
+
+  .stage-top {
+    display: flex; align-items: center; gap: 9px; margin-bottom: 2px;
+  }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .dot-done { background: var(--done); box-shadow: 0 0 6px var(--done); }
+  .dot-progress { background: var(--progress); box-shadow: 0 0 6px var(--progress); animation: pulse 1.6s ease-in-out infinite; }
+  .dot-todo { background: var(--todo); }
+  .dot-pending { background: var(--pending); }
+
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  .stage-name { font-size: 12px; font-weight: 400; color: var(--text); flex: 1; }
+  .stage-name.done-text { color: var(--text2); text-decoration: line-through; text-decoration-color: var(--text3); }
+  .stage-name.pending-text { color: var(--text3); }
+  .stage-note { font-size: 10px; color: var(--text3); margin-left: 16px; margin-top: 2px; line-height: 1.5; }
+
+  .stage-right { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+  .date-chip {
+    font-family: 'DM Mono', monospace; font-size: 9px; font-weight: 500;
+    color: #0b0c0e; background: var(--text2);
+    padding: 2px 6px; border-radius: 20px; white-space: nowrap;
+  }
+  .badge {
+    font-family: 'DM Mono', monospace; font-size: 9px;
+    letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 2px 6px; border-radius: 20px; flex-shrink: 0;
+  }
+  .badge-done    { background: rgba(76,175,110,0.12); color: var(--done); border: 1px solid rgba(76,175,110,0.25); }
+  .badge-progress{ background: rgba(232,168,60,0.12); color: var(--progress); border: 1px solid rgba(232,168,60,0.25); }
+  .badge-todo    { background: rgba(58,108,200,0.12); color: var(--todo); border: 1px solid rgba(58,108,200,0.25); }
+  .badge-pending { background: rgba(85,90,107,0.12); color: var(--text3); border: 1px solid rgba(85,90,107,0.25); }
+
+  /* Today banner */
+  .today-banner {
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    padding: 10px 40px;
+    display: flex; align-items: flex-start; gap: 12px;
+  }
+  .today-label {
+    font-family: 'DM Mono', monospace; font-size: 9px;
+    letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--text3); white-space: nowrap; padding-top: 3px; flex-shrink: 0;
+  }
+  .today-tasks { display: flex; flex-wrap: wrap; gap: 6px; }
+  .today-task {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 11px; padding: 3px 10px; border-radius: 20px; border: 1px solid; white-space: nowrap; cursor: pointer;
+  }
+  .today-task-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+  .today-task.us { color: var(--accent-us); border-color: rgba(200,169,110,0.3); background: rgba(200,169,110,0.07); }
+  .today-task.mx { color: var(--accent-mx); border-color: rgba(110,184,169,0.3); background: rgba(110,184,169,0.07); }
+  .today-task.kr { color: var(--accent-kr); border-color: rgba(160,124,212,0.3); background: rgba(160,124,212,0.07); }
+  .today-task-brand { font-family: 'DM Mono', monospace; font-size: 9px; opacity: 0.7; }
+
+  /* Summary bar */
+  .summary-bar {
+    border-top: 1px solid var(--border);
+    padding: 12px 40px;
+    display: flex; gap: 24px; align-items: center;
+    background: var(--surface);
+  }
+  .summary-item {
+    display: flex; align-items: center; gap: 7px;
+    font-family: 'DM Mono', monospace; font-size: 10px; color: var(--text3); letter-spacing: 0.08em;
+  }
+  .summary-dot { width: 6px; height: 6px; border-radius: 50%; }
+
+  /* Modal */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+    z-index: 100; align-items: center; justify-content: center;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: var(--surface2); border: 1px solid var(--border2);
+    border-radius: 8px; padding: 28px; width: 440px; max-width: 90vw;
+    animation: modalIn 0.2s ease;
+  }
+  @keyframes modalIn { from{opacity:0;transform:scale(0.96) translateY(10px)} to{opacity:1;transform:none} }
+  .modal-title { font-family: 'DM Serif Display', serif; font-size: 18px; margin-bottom: 3px; }
+  .modal-sub { font-size: 11px; color: var(--text3); margin-bottom: 20px; }
+  .modal-label {
+    font-family: 'DM Mono', monospace; font-size: 9px;
+    letter-spacing: 0.15em; text-transform: uppercase; color: var(--text3);
+    margin-bottom: 7px; display: block;
+  }
+  .status-select, .note-input, .date-input {
+    width: 100%; background: var(--surface); border: 1px solid var(--border2);
+    border-radius: 6px; color: var(--text); font-family: 'Noto Sans KR', sans-serif;
+    font-size: 12px; padding: 9px 13px; margin-bottom: 14px; outline: none;
+  }
+  .note-input { resize: vertical; min-height: 70px; }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+  .btn {
+    padding: 8px 20px; border-radius: 6px;
+    font-family: 'DM Mono', monospace; font-size: 10px;
+    letter-spacing: 0.1em; cursor: pointer; border: none; transition: all 0.15s;
+  }
+  .btn-cancel { background: transparent; color: var(--text3); border: 1px solid var(--border2); }
+  .btn-cancel:hover { color: var(--text2); }
+  .btn-save { background: var(--accent-us); color: #0b0c0e; font-weight: 500; }
+  .btn-save:hover { filter: brightness(1.1); }
+
+  /* AI Chat */
+  .ai-fab {
+    position: fixed; bottom: 24px; right: 24px;
+    width: 50px; height: 50px; border-radius: 50%;
+    background: linear-gradient(135deg, #c8a96e 0%, #a07cd4 100%);
+    border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    z-index: 200; transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .ai-fab:hover { transform: scale(1.08); }
+
+  .ai-panel {
+    position: fixed; bottom: 86px; right: 24px;
+    width: 340px; max-height: 500px;
+    background: var(--surface2); border: 1px solid var(--border2);
+    border-radius: 14px; display: flex; flex-direction: column;
+    z-index: 200; box-shadow: 0 12px 48px rgba(0,0,0,0.6);
+    overflow: hidden; transition: opacity 0.2s, transform 0.2s;
+  }
+  .ai-panel.hidden { opacity: 0; pointer-events: none; transform: translateY(10px); }
+  .ai-panel-header {
+    padding: 13px 16px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+  }
+  .ai-panel-title { font-family: 'DM Serif Display', serif; font-size: 15px; flex: 1; }
+  .ai-panel-sub { font-family: 'DM Mono', monospace; font-size: 9px; color: var(--text3); }
+  .ai-close { background: none; border: none; color: var(--text3); cursor: pointer; font-size: 18px; }
+  .ai-close:hover { color: var(--text); }
+  .ai-messages {
+    flex: 1; overflow-y: auto; padding: 12px 14px;
+    display: flex; flex-direction: column; gap: 8px; min-height: 140px;
+  }
+  .ai-msg { max-width: 88%; padding: 8px 12px; border-radius: 10px; font-size: 12px; line-height: 1.6; }
+  .ai-msg.user { align-self: flex-end; background: rgba(200,169,110,0.15); border: 1px solid rgba(200,169,110,0.25); color: var(--text); }
+  .ai-msg.ai { align-self: flex-start; background: var(--surface); border: 1px solid var(--border2); color: var(--text2); }
+  .ai-msg.ai.thinking { color: var(--text3); font-style: italic; font-family: 'DM Mono',monospace; font-size: 11px; }
+  .ai-msg .changes { margin-top: 7px; display: flex; flex-direction: column; gap: 3px; }
+  .ai-change-chip {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-family: 'DM Mono', monospace; font-size: 10px;
+    padding: 2px 8px; border-radius: 20px;
+    background: rgba(76,175,110,0.12); border: 1px solid rgba(76,175,110,0.25); color: var(--done);
+  }
+  .ai-input-row { display: flex; gap: 7px; padding: 10px 12px; border-top: 1px solid var(--border); flex-shrink: 0; }
+  .ai-input {
+    flex: 1; background: var(--surface); border: 1px solid var(--border2);
+    border-radius: 8px; color: var(--text); font-family: 'Noto Sans KR', sans-serif;
+    font-size: 12px; padding: 8px 11px; outline: none; resize: none; line-height: 1.5; max-height: 72px;
+  }
+  .ai-input:focus { border-color: var(--accent-us); }
+  .ai-send {
+    background: linear-gradient(135deg, #c8a96e, #a07cd4); border: none;
+    border-radius: 8px; width: 34px; cursor: pointer; font-size: 14px;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .ai-send:hover { filter: brightness(1.15); }
+  .ai-send:disabled { opacity: 0.4; cursor: not-allowed; }
+  .ai-hints { padding: 0 12px 8px; display: flex; flex-wrap: wrap; gap: 4px; }
+  .ai-hint {
+    font-family: 'DM Mono', monospace; font-size: 9px; color: var(--text3);
+    border: 1px solid var(--border2); border-radius: 20px; padding: 2px 8px; cursor: pointer;
+  }
+  .ai-hint:hover { color: var(--text2); border-color: var(--text3); }
+
+  @media (max-width: 900px) {
+    header { padding: 16px 18px; }
+    main { grid-template-columns: 1fr; }
+    .project-col { border-right: none; border-bottom: 1px solid var(--border); }
+    .today-banner { padding: 10px 18px; }
+    .summary-bar { padding: 12px 18px; flex-wrap: wrap; gap: 12px; }
+    .ai-panel { width: calc(100vw - 28px); right: 14px; }
+    .ai-fab { bottom: 16px; right: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">SERA <span>H&amp;B</span></div>
+  </div>
+  <div class="header-right">
+    <div class="header-date">
+      <span id="current-date"></span><span style="margin:0 5px;opacity:0.3;">·</span><span>Project Tracker</span>
+    </div>
+    <div class="sync-dot" id="sync-dot" title="동기화 상태"></div>
+  </div>
+</header>
+
+<div class="today-banner">
+  <div class="today-label">TODAY</div>
+  <div class="today-tasks" id="today-tasks"></div>
+</div>
+
+<main id="main-grid"></main>
+
+<div class="summary-bar">
+  <div class="summary-item"><div class="summary-dot" style="background:var(--done)"></div>완료</div>
+  <div class="summary-item"><div class="summary-dot" style="background:var(--progress);animation:pulse 1.6s infinite"></div>진행중</div>
+  <div class="summary-item"><div class="summary-dot" style="background:var(--todo)"></div>예정</div>
+  <div class="summary-item"><div class="summary-dot" style="background:var(--pending)"></div>보류</div>
+  <div style="margin-left:auto;font-family:'DM Mono',monospace;font-size:9px;color:var(--text3)">단계 클릭 → 업데이트 · ✦ AI 자동반영</div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <div class="modal-title" id="modal-stage-name"></div>
+    <div class="modal-sub" id="modal-project-name"></div>
+    <label class="modal-label">진행 상태</label>
+    <select class="status-select" id="modal-status">
+      <option value="done">✅ 완료 (Done)</option>
+      <option value="progress">🔄 진행중 (In Progress)</option>
+      <option value="todo">📋 예정 (To Do)</option>
+      <option value="pending">⏸ 보류 (Pending)</option>
+    </select>
+    <label class="modal-label">목표일 (선택)</label>
+    <input type="date" class="date-input" id="modal-date">
+    <label class="modal-label">메모 / 현황</label>
+    <textarea class="note-input" id="modal-note" placeholder="현재 상황, 이슈, 다음 액션..."></textarea>
+    <div class="modal-actions">
+      <button class="btn btn-cancel" onclick="closeModal()">취소</button>
+      <button class="btn btn-save" onclick="saveStage()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- AI FAB -->
+<button class="ai-fab" onclick="togglePanel()" title="AI 업데이트">✦</button>
+
+<div class="ai-panel hidden" id="ai-panel">
+  <div class="ai-panel-header">
+    <div>
+      <div class="ai-panel-title">AI 업데이트</div>
+      <div class="ai-panel-sub">자연어로 말하면 자동 반영됩니다</div>
+    </div>
+    <button class="ai-close" onclick="togglePanel()">×</button>
+  </div>
+  <div class="ai-messages" id="ai-messages">
+    <div class="ai-msg ai">프로젝트 진행상황을 자연어로 알려주세요.<br>예) "Xeer 용기 수령 완료" · "멕시코 라인업 확정" · "전체 현황 요약"</div>
+  </div>
+  <div class="ai-hints">
+    <span class="ai-hint" onclick="fillHint(this)">Xeer 용기 수령 완료</span>
+    <span class="ai-hint" onclick="fillHint(this)">멕시코 라인업 확정</span>
+    <span class="ai-hint" onclick="fillHint(this)">LSR 화장품법 완료</span>
+    <span class="ai-hint" onclick="fillHint(this)">전체 현황 요약</span>
+  </div>
+  <div class="ai-input-row">
+    <textarea class="ai-input" id="ai-input" placeholder="진행상황 입력..." rows="1"
+      onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAI();}"></textarea>
+    <button class="ai-send" id="ai-send-btn" onclick="sendAI()">➤</button>
+  </div>
+</div>
+
+<script>
+// ── Projects ──────────────────────────────────────────────────────────
+const projects = [
+  {
+    id: 'us', flag: '🇺🇸', country: 'United States',
+    brand: 'Xeer', type: 'OEM 제조', typeIcon: '🏭',
+    stages: [
+      { id: 'us-1', name: '바이어 미팅 & NDA 체결',            status: 'done',     date: '',           note: '완료' },
+      { id: 'us-2', name: '제품 컨셉 & 포뮬라 협의',           status: 'done',     date: '',           note: '완료' },
+      { id: 'us-3', name: '용기 소싱 & 선정',                   status: 'progress', date: '2026-03-20', note: '용기 샘플 3/20 수령 예정 → 사진 공유 후 Zarati 피드백 대기' },
+      { id: 'us-4', name: '패키지 사양 확정 (사이즈·인쇄방식)', status: 'progress', date: '',           note: '직접 인쇄(영문) 방식 확정. 용기 확정 후 규격 산출 예정. Zarati reference 디자인 활용 의향' },
+      { id: 'us-5', name: '디자인 개발 & 시안 승인',            status: 'todo',     date: '',           note: 'Zarati 측에서 브랜드명·제품명 포함 디자인 준비. 용기 스펙 전달 후 착수' },
+      { id: 'us-6', name: '샘플 제작 (완제품·규제 제출용)',     status: 'todo',     date: '',           note: '완제품 형태 확정 (규제 기관 제출 목적). 소량 단가 높음 고지 완료. 비용 확정 즉시 착수 요청' },
+      { id: 'us-7', name: '샘플 비용 확정 & 승인',              status: 'todo',     date: '',           note: '원자재·패키지 가격 인상 가능성 (지정학적 요인). 견적 확정 후 Zarati 승인 필요' },
+      { id: 'us-8', name: '규제 서류 제출 (FDA)',                status: 'todo',     date: '',           note: '샘플 완제품 기반 규제 제출' },
+      { id: 'us-9', name: '본계약 & PO 수령 → 본생산',          status: 'pending',  date: '',           note: '' },
+      { id: 'us-10',name: '수출 통관 & 납품',                   status: 'pending',  date: '',           note: '' },
+    ]
+  },
+  {
+    id: 'mx', flag: '🇲🇽', country: 'Mexico',
+    brand: 'SKIN.NEU', type: '제조 · 유통', typeIcon: '🚚',
+    stages: [
+      { id: 'mx-1', name: '시장 조사 & 파트너 발굴',       status: 'done',     date: '', note: '' },
+      { id: 'mx-2', name: '제품 라인업 확정',               status: 'progress', date: '', note: '' },
+      { id: 'mx-3', name: '현지 법인/유통사 계약',          status: 'todo',     date: '', note: '' },
+      { id: 'mx-4', name: 'COFEPRIS 인허가 준비',           status: 'todo',     date: '', note: '' },
+      { id: 'mx-5', name: '라벨링 현지화 (스페인어)',        status: 'todo',     date: '', note: '' },
+      { id: 'mx-6', name: '샘플 승인 & 가격 협의',          status: 'todo',     date: '', note: '' },
+      { id: 'mx-7', name: '첫 오더 생산',                   status: 'pending',  date: '', note: '' },
+      { id: 'mx-8', name: '현지 창고 & 물류 셋업',          status: 'pending',  date: '', note: '' },
+      { id: 'mx-9', name: '런칭 마케팅 실행',               status: 'pending',  date: '', note: '' },
+      { id: 'mx-10',name: '리오더 & 정기 공급 체계',        status: 'pending',  date: '', note: '' },
+    ]
+  },
+  {
+    id: 'kr', flag: '🇰🇷', country: 'South Korea',
+    brand: 'LSR', type: '방판업체 납품 · 제조', typeIcon: '📦',
+    stages: [
+      { id: 'kr-1', name: '브랜드 컨셉 & 타겟 확정',           status: 'done',     date: '', note: '' },
+      { id: 'kr-2', name: '제품 포뮬라 개발',                   status: 'done',     date: '', note: '' },
+      { id: 'kr-3', name: '제품 라인업 확정',                   status: 'progress', date: '', note: '방문판매 업체 납품 목적에 맞는 라인업 선정 중' },
+      { id: 'kr-4', name: '화장품법 준수 검토',                 status: 'todo',     date: '', note: '' },
+      { id: 'kr-5', name: '패키지 디자인 & 제작',               status: 'todo',     date: '', note: '' },
+      { id: 'kr-6', name: '방문판매 납품업체 발굴 & 계약',      status: 'todo',     date: '', note: '직접 판매가 아닌 방문판매 업체에 B2B 납품 구조' },
+      { id: 'kr-7', name: '샘플 제출 & 업체 승인',              status: 'todo',     date: '', note: '' },
+      { id: 'kr-8', name: '첫 납품 생산 & 출하',                status: 'pending',  date: '', note: '' },
+      { id: 'kr-9', name: '정기 공급 계약 & 리오더',            status: 'pending',  date: '', note: '' },
+      { id: 'kr-10',name: '거래처 확대 & 매출 분석',            status: 'pending',  date: '', note: '' },
+    ]
+  }
+];
+
+// ── Shared Storage ────────────────────────────────────────────────────
+const STORAGE_KEY = 'sera_hnb_v4';
+let state = null;
+let activeStageId = null;
+let lastSyncHash = '';
+
+function defaultState() {
+  const s = {};
+  projects.forEach(p => p.stages.forEach(st => {
+    s[st.id] = { status: st.status, date: st.date, note: st.note };
+  }));
+  return s;
+}
+
+function hashState(s) {
+  return JSON.stringify(s);
+}
+
+function setSyncDot(status) {
+  const dot = document.getElementById('sync-dot');
+  if (!dot) return;
+  dot.className = 'sync-dot ' + status;
+  dot.title = { ok: '동기화 완료', syncing: '동기화 중...', err: '동기화 오류' }[status] || '';
+}
+
+// ── Vercel API 설정 (토큰 불필요, 누구나 읽기/쓰기/AI) ──────────────
+const API_BASE = '/api';  // Vercel 서버리스 함수
+let ghFileSha  = null;
+
+async function loadState() {
+  setSyncDot('syncing');
+  try {
+    const res = await fetch(API_BASE + '/state');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.state && Object.keys(data.state).some(k => k.startsWith('us-') || k.startsWith('mx-') || k.startsWith('kr-'))) {
+        state = data.state;
+        ghFileSha = data.sha;
+      }
+    }
+  } catch(e) {}
+  if (!state) {
+    state = defaultState();
+    await persistState();
+  }
+  lastSyncHash = hashState(state);
+  setSyncDot('ok');
+}
+
+async function persistState() {
+  setSyncDot('syncing');
+  try {
+    const res = await fetch(API_BASE + '/state', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ state, sha: ghFileSha })
+    });
+    if (res.ok) {
+      const data = await res.json();
+      ghFileSha = data.sha;
+      lastSyncHash = hashState(state);
+      setSyncDot('ok');
+    } else {
+      setSyncDot('err');
+    }
+  } catch(e) { setSyncDot('err'); }
+}
+
+async function pollSync() {
+  try {
+    const res = await fetch(API_BASE + '/state');
+    if (res.ok) {
+      const data = await res.json();
+      if (data.state) {
+        const h = hashState(data.state);
+        if (h !== lastSyncHash) {
+          state = data.state;
+          ghFileSha = data.sha;
+          lastSyncHash = h;
+          render();
+          renderToday();
+          showToast('✓ 팀 업데이트 반영됨', '#4caf6e');
+          setSyncDot('ok');
+        }
+      }
+    }
+  } catch(e) {}
+}
+
+function showToast(msg, color) {
+  let t = document.getElementById('sync-toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'sync-toast';
+    t.style.cssText = `position:fixed;top:18px;left:50%;transform:translateX(-50%);
+      color:#0b0c0e;font-family:'DM Mono',monospace;font-size:11px;
+      padding:6px 16px;border-radius:20px;z-index:9999;letter-spacing:0.1em;
+      box-shadow:0 4px 16px rgba(0,0,0,0.4);transition:opacity 0.5s;pointer-events:none;`;
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.background = color || '#4caf6e';
+  t.style.opacity = '1';
+  clearTimeout(t._hide);
+  t._hide = setTimeout(() => { t.style.opacity = '0'; }, 2200);
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────
+const STATUS_META = {
+  done:     { dot: 'dot-done',     badge: 'badge-done',     label: '완료',   textClass: 'done-text' },
+  progress: { dot: 'dot-progress', badge: 'badge-progress', label: '진행중', textClass: '' },
+  todo:     { dot: 'dot-todo',     badge: 'badge-todo',     label: '예정',   textClass: '' },
+  pending:  { dot: 'dot-pending',  badge: 'badge-pending',  label: '보류',   textClass: 'pending-text' },
+};
+
+function calcProgress(proj) {
+  const w = { done: 1, progress: 0.5, todo: 0, pending: 0 };
+  const total = proj.stages.reduce((s, st) => s + w[state[st.id].status], 0);
+  return Math.round((total / proj.stages.length) * 100);
+}
+
+function formatDate(d) {
+  if (!d) return '';
+  const dt = new Date(d + 'T00:00:00');
+  return `${dt.getMonth()+1}/${dt.getDate()}`;
+}
+
+// ── Render ────────────────────────────────────────────────────────────
+function render() {
+  if (!state) return;
+  const grid = document.getElementById('main-grid');
+  grid.innerHTML = '';
+  projects.forEach(proj => {
+    const pct = calcProgress(proj);
+    const col = document.createElement('div');
+    col.className = `project-col col-${proj.id}`;
+    col.innerHTML = `
+      <div class="col-header">
+        <div class="col-flag-country">
+          <span class="col-flag">${proj.flag}</span>
+          <span class="col-country">${proj.country}</span>
+        </div>
+        <div class="col-brand">${proj.brand}</div>
+        <div class="col-type"><span class="col-type-icon">${proj.typeIcon}</span>${proj.type}</div>
+        <div class="progress-bar-wrap">
+          <div class="progress-bar" style="width:0%" data-pct="${pct}"></div>
+        </div>
+        <div class="progress-label">
+          <span>진행률</span>
+          <span class="progress-pct">${pct}%</span>
+        </div>
+      </div>
+      <div class="stages" id="stages-${proj.id}"></div>
+    `;
+    grid.appendChild(col);
+
+    const stagesEl = col.querySelector(`#stages-${proj.id}`);
+    proj.stages.forEach((stage, idx) => {
+      const s = state[stage.id];
+      const meta = STATUS_META[s.status];
+      const item = document.createElement('div');
+      item.className = 'stage-item';
+      item.onclick = () => openModal(proj, stage);
+      const dd = s.date ? formatDate(s.date) : '';
+      item.innerHTML = `
+        <div class="stage-top">
+          <div class="status-dot ${meta.dot}"></div>
+          <div class="stage-name ${meta.textClass}">${idx+1}. ${stage.name}</div>
+          <div class="stage-right">
+            ${dd ? `<span class="date-chip">${dd}</span>` : ''}
+            <span class="badge badge-${s.status}">${meta.label}</span>
+          </div>
+        </div>
+        ${s.note ? `<div class="stage-note">💬 ${s.note}</div>` : ''}
+      `;
+      stagesEl.appendChild(item);
+    });
+  });
+  requestAnimationFrame(() => {
+    document.querySelectorAll('.progress-bar').forEach(b => { b.style.width = b.dataset.pct + '%'; });
+  });
+}
+
+function renderToday() {
+  if (!state) return;
+  const el = document.getElementById('today-tasks');
+  el.innerHTML = '';
+  const today = new Date().toISOString().slice(0, 10);
+  const tasks = [];
+  projects.forEach(proj => {
+    proj.stages.forEach(stage => {
+      const s = state[stage.id];
+      if (s.date === today || s.status === 'progress') tasks.push({ proj, stage, s, isToday: s.date === today });
+    });
+  });
+  if (!tasks.length) {
+    el.innerHTML = `<span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--text3)">진행중인 항목 없음</span>`;
+    return;
+  }
+  tasks.forEach(({ proj, stage, isToday }) => {
+    const chip = document.createElement('div');
+    chip.className = `today-task ${proj.id}`;
+    const accent = proj.id==='us'?'var(--accent-us)':proj.id==='mx'?'var(--accent-mx)':'var(--accent-kr)';
+    chip.innerHTML = `
+      <div class="today-task-dot" style="background:${accent}"></div>
+      <span class="today-task-brand">${proj.brand}</span>
+      <span>${stage.name}</span>
+      ${isToday ? `<span style="font-size:9px;opacity:0.6">📅 오늘</span>` : ''}
+    `;
+    chip.onclick = () => openModal(proj, stage);
+    el.appendChild(chip);
+  });
+}
+
+// ── Modal ─────────────────────────────────────────────────────────────
+function openModal(proj, stage) {
+  activeStageId = stage.id;
+  const s = state[stage.id];
+  document.getElementById('modal-stage-name').textContent = stage.name;
+  document.getElementById('modal-project-name').textContent = `${proj.flag} ${proj.brand} · ${proj.type}`;
+  document.getElementById('modal-status').value = s.status;
+  document.getElementById('modal-date').value = s.date;
+  document.getElementById('modal-note').value = s.note;
+  document.getElementById('modal').classList.add('open');
+}
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+  activeStageId = null;
+}
+async function saveStage() {
+  if (!activeStageId) return;
+  state[activeStageId] = {
+    status: document.getElementById('modal-status').value,
+    date: document.getElementById('modal-date').value,
+    note: document.getElementById('modal-note').value,
+  };
+  await persistState();
+  closeModal();
+  render();
+  renderToday();
+  showToast('✓ 저장 완료', '#c8a96e');
+}
+document.getElementById('modal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+// ── AI Chat ───────────────────────────────────────────────────────────
+function togglePanel() { document.getElementById('ai-panel').classList.toggle('hidden'); }
+function fillHint(el) { document.getElementById('ai-input').value = el.textContent; document.getElementById('ai-input').focus(); }
+
+function addMsg(text, role, extra) {
+  const box = document.getElementById('ai-messages');
+  const div = document.createElement('div');
+  div.className = `ai-msg ${role}`;
+  div.innerHTML = text;
+  if (extra) div.appendChild(extra);
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+  return div;
+}
+
+async function sendAI() {
+  const input = document.getElementById('ai-input');
+  const btn = document.getElementById('ai-send-btn');
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = '';
+  btn.disabled = true;
+  addMsg(text, 'user');
+  const thinking = addMsg('분석 중...', 'ai thinking');
+
+  const stateDesc = projects.map(proj =>
+    `[${proj.brand}/${proj.country}]\n` +
+    proj.stages.map((s,i) => {
+      const st = state[s.id];
+      return `  ${i+1}. id=${s.id} | "${s.name}" | ${st.status} | 날짜=${st.date||'없음'} | 메모=${st.note||'없음'}`;
+    }).join('\n')
+  ).join('\n\n');
+
+  const systemPrompt = `당신은 SERA H&B 프로젝트 매니저 어시스턴트입니다.
+사용자의 자연어 입력으로 프로젝트 단계를 업데이트하거나 현황을 요약합니다.
+
+현재 상태:
+${stateDesc}
+
+상태값: done | progress | todo | pending
+
+반드시 JSON만 응답. 두 가지 형태:
+1. {"type":"update","reply":"한국어 메시지","changes":[{"id":"단계id","status":"새상태","date":"YYYY-MM-DD or ''","note":"메모"}]}
+2. {"type":"info","reply":"한국어 답변"}`;
+
+  try {
+    const res = await fetch(API_BASE + '/ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: text }]
+      })
+    });
+    const data = await res.json();
+    const raw = data.content?.find(c => c.type === 'text')?.text || '';
+    let parsed;
+    try { parsed = JSON.parse(raw.replace(/```json|```/g,'').trim()); }
+    catch { thinking.remove(); addMsg('파싱 오류. 다시 시도해주세요.', 'ai'); btn.disabled=false; return; }
+
+    thinking.remove();
+    if (parsed.type === 'update' && parsed.changes?.length) {
+      parsed.changes.forEach(ch => {
+        if (state[ch.id]) state[ch.id] = {
+          status: ch.status || state[ch.id].status,
+          date: ch.date !== undefined ? ch.date : state[ch.id].date,
+          note: ch.note !== undefined ? ch.note : state[ch.id].note,
+        };
+      });
+      await persistState();
+      render(); renderToday();
+      const wrap = document.createElement('div');
+      wrap.className = 'changes';
+      parsed.changes.forEach(ch => {
+        let name = ch.id;
+        projects.forEach(p => p.stages.forEach(s => { if(s.id===ch.id) name=s.name; }));
+        const c = document.createElement('div');
+        c.className = 'ai-change-chip';
+        c.textContent = `✓ ${name} → ${ch.status}`;
+        wrap.appendChild(c);
+      });
+      addMsg(parsed.reply, 'ai', wrap);
+      showToast('✓ AI 업데이트 완료', '#4caf6e');
+    } else {
+      addMsg(parsed.reply || '완료.', 'ai');
+    }
+  } catch(e) {
+    thinking.remove();
+    addMsg('오류: ' + e.message, 'ai');
+  }
+  btn.disabled = false;
+}
+
+// ── Init ──────────────────────────────────────────────────────────────
+function updateDate() {
+  const opts = { year:'numeric', month:'long', day:'numeric', weekday:'short' };
+  document.getElementById('current-date').textContent = new Date().toLocaleDateString('ko-KR', opts);
+}
+updateDate();
+loadState().then(() => {
+  render();
+  renderToday();
+  setInterval(pollSync, 10000);
+});
+</script>
+</body>
+</html>
